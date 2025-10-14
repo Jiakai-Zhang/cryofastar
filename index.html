@@ -92,45 +92,8 @@
                     <span>Code</span>
                   </a>
                 </span>
-                <span class="link-block">
-                  <a href="#downloads"
-                     class="external-link button is-normal is-rounded is-dark">
-                    <span class="icon">
-                      <i class="fas fa-download"></i>
-                    </span>
-                    <span>Results</span>
-                  </a>
-                </span>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="section">
-    <div class="container is-max-desktop">
-      <div class="columns is-multiline">
-        <div class="column is-one-third-desktop is-full-tablet">
-          <div class="box highlight-box has-text-centered">
-            <p class="metric-value">33.21×</p>
-            <p class="metric-label">Faster than CryoDRGN2</p>
-            <p class="metric-source">Table&nbsp;2, arXiv:2506.05864</p>
-          </div>
-        </div>
-        <div class="column is-one-third-desktop is-full-tablet">
-          <div class="box highlight-box has-text-centered">
-            <p class="metric-value">113,600</p>
-            <p class="metric-label">Simulated protein volumes for training</p>
-            <p class="metric-source">Sec.&nbsp;5, arXiv:2506.05864</p>
-          </div>
-        </div>
-        <div class="column is-one-third-desktop is-full-tablet">
-          <div class="box highlight-box has-text-centered">
-            <p class="metric-value">⩽00:03:31</p>
-            <p class="metric-label">Per-dataset initialization time</p>
-            <p class="metric-source">Table&nbsp;2, arXiv:2506.05864</p>
           </div>
         </div>
       </div>
@@ -142,6 +105,8 @@
       <div class="item">
         <img src="static/images/teaser.png" alt="CryoFastAR overview illustration showing feed-forward cryo-EM reconstruction." class="center-image"/>
         <h2 class="subtitle has-text-justified">
+          <b>TL;DR:</b> CryoFastAR turns noisy cryo-EM particle stacks into high-fidelity <i>ab initio</i> reconstructions with a single feed-forward pass—no iterative pose bootstrapping required.
+          <br><br>
           <b>CryoFastAR performs feed-forward pose estimation and reconstruction.</b>
           By leveraging multi-view integration and progressive training on large-scale simulated cryo-EM data, CryoFastAR predicts particle poses directly and dramatically accelerates <i>ab initio</i> reconstruction compared with iterative solvers.
         </h2>
@@ -186,31 +151,11 @@
       <div class="container is-max-desktop">
         <div class="column is-full">
           <div class="content">
-            <h2 class="title is-3">Method Overview</h2>
+            <h2 class="title is-3">Pipeline</h2>
             <img src="static/images/pipeline.png" alt="Pipeline diagram summarizing CryoFastAR's pose estimation and reconstruction architecture." class="center-image">
             <div class="content has-text-justified">
               CryoFastAR employs a ViT-Large encoder, a decoder with view integration and updating blocks, and downstream heads for pose regression.
               Training progresses from clean two-view projections to noisy, CTF-augmented multi-view images, and finally to real particle data, ensuring robust generalization. The model processes large batches of views simultaneously, delivering feed-forward pose predictions ready for refinement.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="hero is-small">
-    <div class="hero-body">
-      <div class="container is-max-desktop">
-        <div class="columns">
-          <div class="column">
-            <div class="content">
-              <h2 class="title is-3">Core Contributions</h2>
-              <ul>
-                <li>First geometric foundation model tailored for cryo-EM pose estimation, operating in a single feed-forward pass.</li>
-                <li>Large-scale training corpus with 113,600 simulated protein complexes and realistic CTF/noise augmentations.</li>
-                <li>Progressive curriculum that stabilizes learning and narrows the simulation-to-real gap.</li>
-                <li>Significant acceleration (33.21× vs CryoDRGN2, 3.33× vs CryoSPARC) while keeping reconstruction quality competitive.</li>
-              </ul>
             </div>
           </div>
         </div>
@@ -238,32 +183,31 @@
   <section class="hero is-small" id="results">
     <div class="hero-body">
       <div class="container is-max-desktop">
+        <div class="content has-text-centered">
+          <h2 class="title is-3">Qualitative Results</h2>
+        </div>
         <div class="content">
-          <h2 class="title is-3">Results Summary</h2>
-          <p>
-            On simulated benchmarks (Spliceosome, Spike, FA), CryoFastAR achieves rotation F-norm errors of 0.041–0.060 with sub-pixel translations and 4.33–9.33Å reconstructions in around 82 seconds per dataset.
-            Real cryo-EM evaluations on RAG, 50S ribosome, and Spliceosome deliver 0.956–1.729 rotation errors after initialization and improve further with lightweight refinement, all while finishing each dataset in under four minutes.
+          <h3 class="title is-4">Synthetic Benchmarks</h3>
+          <img src="static/images/synthetic_gallery.png" alt="Synthetic reconstructions comparing CryoFastAR with traditional iterative solvers across multiple molecules." class="center-image">
+          <p class="has-text-justified">
+            CryoFastAR preserves fine structural details across simulated complexes while avoiding the artifacts that iterative pose-bootstrapping methods sometimes introduce. Visual comparisons highlight sharper density recovery for flexible regions and cleaner background suppression on challenging molecules.
           </p>
-          <p>
-            Compared with CryoSPARC and CryoDRGN2 baselines, CryoFastAR maintains competitive accuracy and offers dramatic speed-ups, making feed-forward initialization practical for large cryo-EM datasets.
+        </div>
+        <div class="content">
+          <h3 class="title is-4">Experimental Datasets</h3>
+          <img src="static/images/experimental_spliceosome.png" alt="Qualitative comparison on the experimental spliceosome dataset showing CryoFastAR capturing more complete structures." class="center-image">
+          <p class="has-text-justified">
+            On the experimental spliceosome dataset, CryoFastAR reconstructs cohesive densities that trace helices and peripheral domains, while iterative baselines struggle with missing or noisy regions. Feed-forward predictions offer a clean starting volume that downstream refinement can further polish.
+          </p>
+        </div>
+        <div class="content">
+          <h3 class="title is-4">Pose Coverage</h3>
+          <img src="static/images/experimental_histograms.png" alt="Orientation histograms comparing CryoFastAR predictions and references across experimental datasets." class="center-image">
+          <p class="has-text-justified">
+            Orientation histograms demonstrate that CryoFastAR captures wide pose coverage on real data, matching ground-truth angular distributions without iterative realignment. This balanced coverage helps downstream refinement converge quickly on consistent structures.
           </p>
         </div>
       </div>
-    </div>
-  </section>
-
-  <section class="section" id="downloads">
-    <div class="container is-max-desktop content">
-      <h2 class="title is-3">Downloadable Results</h2>
-      <p>
-        The following curated files summarize the quantitative benchmarks reported in the paper.
-        They are ready for plotting, further analysis, or integration into downstream pipelines.
-      </p>
-      <ul class="download-list">
-        <li><a href="static/results/cryofastar_simulated_metrics.csv" download>cryofastar_simulated_metrics.csv</a> — rotation/translation/resolution for simulated datasets.</li>
-        <li><a href="static/results/cryofastar_real_metrics.csv" download>cryofastar_real_metrics.csv</a> — accuracy and runtime on RAG, 50S, and Spliceosome experimental data.</li>
-        <li><a href="static/results/cryofastar_speedup.txt" download>cryofastar_speedup.txt</a> — headline speed comparisons vs CryoSPARC and CryoDRGN2.</li>
-      </ul>
     </div>
   </section>
 
