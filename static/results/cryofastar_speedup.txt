@@ -1,0 +1,4 @@
+CryoFastAR speed analysis (from CryoFastAR: Fast Cryo-EM Ab initio Reconstruction Made Easy)
+- 3.33x faster than CryoSPARC on experimental datasets (Table 2).
+- 33.21x faster than CryoDRGN2 on experimental datasets (Table 2).
+- Processes 100k+ particle poses in under 4 minutes per dataset during init (Table 2, Ours rows).

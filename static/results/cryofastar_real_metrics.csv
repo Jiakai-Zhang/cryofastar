@@ -1,0 +1,7 @@
+dataset,phase,rotation_frobenius_error,translation_error_px,time_hh_mm_ss
+RAG,Init,1.7292,5.1064,00:02:39
+50S Ribosome,Init,1.1521,2.1989,00:01:58
+Spliceosome,Init,0.9564,4.8698,00:03:31
+RAG,Refined,1.6089,4.5414,00:06:54
+50S Ribosome,Refined,0.9355,2.2584,00:05:47
+Spliceosome,Refined,0.9734,4.9134,00:08:03
