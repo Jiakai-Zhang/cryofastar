@@ -103,10 +103,11 @@
   <section class="hero teaser">
     <div class="container is-max-desktop">
       <div class="item">
+        <p class="teaser-tldr has-text-centered">
+          <b>TL;DR:</b> CryoFastAR turns noisy cryo-EM particle stacks into high-fidelity <i>ab initio</i> reconstructions with a single feed-forward pass—no iterative pose bootstrapping required.
+        </p>
         <img src="static/images/teaser.png" alt="CryoFastAR overview illustration showing feed-forward cryo-EM reconstruction." class="center-image"/>
         <h2 class="subtitle has-text-justified">
-          <b>TL;DR:</b> CryoFastAR turns noisy cryo-EM particle stacks into high-fidelity <i>ab initio</i> reconstructions with a single feed-forward pass—no iterative pose bootstrapping required.
-          <br><br>
           <b>CryoFastAR performs feed-forward pose estimation and reconstruction.</b>
           By leveraging multi-view integration and progressive training on large-scale simulated cryo-EM data, CryoFastAR predicts particle poses directly and dramatically accelerates <i>ab initio</i> reconstruction compared with iterative solvers.
         </h2>
@@ -163,23 +164,6 @@
     </div>
   </section>
 
-  <section class="hero is-small">
-    <div class="hero-body">
-      <div class="container is-max-desktop">
-        <div class="column is-full">
-          <div class="content">
-            <h2 class="title is-3">Ablations &amp; Training Insights</h2>
-            <img src="static/images/ablation.png" alt="Ablation study results showing gains from curriculum stages and architectural choices." class="center-image">
-            <div class="content has-text-justified">
-              Ablation studies demonstrate that staged training, multi-view integration, and high-capacity encoders collectively reduce rotation and translation errors.
-              Removing curriculum steps or view-fusion modules leads to noticeable drops in accuracy, validating the end-to-end design decisions reported in the paper.
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section class="hero is-small" id="results">
     <div class="hero-body">
       <div class="container is-max-desktop">
@@ -187,24 +171,17 @@
           <h2 class="title is-3">Qualitative Results</h2>
         </div>
         <div class="content">
-          <h3 class="title is-4">Synthetic Benchmarks</h3>
+          <h3 class="title is-4">Synthetic Results</h3>
           <img src="static/images/synthetic_gallery.png" alt="Synthetic reconstructions comparing CryoFastAR with traditional iterative solvers across multiple molecules." class="center-image">
           <p class="has-text-justified">
             CryoFastAR preserves fine structural details across simulated complexes while avoiding the artifacts that iterative pose-bootstrapping methods sometimes introduce. Visual comparisons highlight sharper density recovery for flexible regions and cleaner background suppression on challenging molecules.
           </p>
         </div>
         <div class="content">
-          <h3 class="title is-4">Experimental Datasets</h3>
+          <h3 class="title is-4">Experimental Results</h3>
           <img src="static/images/experimental_spliceosome.png" alt="Qualitative comparison on the experimental spliceosome dataset showing CryoFastAR capturing more complete structures." class="center-image">
           <p class="has-text-justified">
             On the experimental spliceosome dataset, CryoFastAR reconstructs cohesive densities that trace helices and peripheral domains, while iterative baselines struggle with missing or noisy regions. Feed-forward predictions offer a clean starting volume that downstream refinement can further polish.
-          </p>
-        </div>
-        <div class="content">
-          <h3 class="title is-4">Pose Coverage</h3>
-          <img src="static/images/experimental_histograms.png" alt="Orientation histograms comparing CryoFastAR predictions and references across experimental datasets." class="center-image">
-          <p class="has-text-justified">
-            Orientation histograms demonstrate that CryoFastAR captures wide pose coverage on real data, matching ground-truth angular distributions without iterative realignment. This balanced coverage helps downstream refinement converge quickly on consistent structures.
           </p>
         </div>
       </div>
@@ -219,6 +196,23 @@
         <li><b>Pretrained checkpoints:</b> The README links to Google Drive archives for synthetic and real-data checkpoints.</li>
         <li><b>Evaluation scripts:</b> Use <code>bash evaluate_model_real.sh</code> and <code>bash evaluate_model_synthetic.sh</code> after downloading checkpoints and datasets to reproduce paper results.</li>
       </ul>
+    </div>
+  </section>
+
+  <section class="hero is-small">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="column is-full">
+          <div class="content">
+            <h2 class="title is-3">Ablations &amp; Training Insights</h2>
+            <img src="static/images/ablation.png" alt="Ablation study results showing gains from curriculum stages and architectural choices." class="center-image">
+            <div class="content has-text-justified">
+              Ablation studies demonstrate that staged training, multi-view integration, and high-capacity encoders collectively reduce rotation and translation errors.
+              Removing curriculum steps or view-fusion modules leads to noticeable drops in accuracy, validating the end-to-end design decisions reported in the paper.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 

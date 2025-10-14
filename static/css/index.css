@@ -139,6 +139,11 @@ body {
   max-width: 100%;
 }
 
+.teaser-tldr {
+  font-size: 1.15rem;
+  margin-bottom: 1rem;
+}
+
 .video-placeholder {
   position: absolute;
   top: 0;
