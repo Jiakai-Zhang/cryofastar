@@ -24,7 +24,7 @@
   <link rel="stylesheet" href="static/css/bulma.min.css">
   <link rel="stylesheet" href="static/css/bulma-carousel.min.css">
   <link rel="stylesheet" href="static/css/bulma-slider.min.css">
-  <link rel="stylesheet" href="static/css/fontawesome.all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-bx3ZMXxu9SXU+Y3CX6XcncxZV8oPZxC25f6/sOlne342XQI3/OQvPsvBLnBxGZ+rsoAhH2m6q+UpfW4U0a+YGQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
   <link rel="stylesheet" href="static/css/index.css">
 
@@ -186,6 +186,24 @@
           <p class="has-text-grey is-size-7 volume-hint">
             双击重置视角。上传新的体数据时，我们会自动推断扩展名（未压缩 MRC/MAP/CCP4）。如需 gzip 压缩，请先解压。
           </p>
+          <div class="volume-iso-controls">
+            <div class="field">
+              <label class="label is-small">正等值面 (<code>+isoval</code>)</label>
+              <div class="control">
+                <input class="input is-small" id="iso-pos-input" type="number" step="0.0001" placeholder="自动">
+              </div>
+            </div>
+            <div class="field">
+              <label class="label is-small">负等值面 (<code>-isoval</code>)</label>
+              <div class="control">
+                <input class="input is-small" id="iso-neg-input" type="number" step="0.0001" placeholder="自动">
+              </div>
+            </div>
+            <div class="buttons are-small volume-iso-buttons">
+              <button class="button is-link is-light" id="apply-iso-button">应用阈值</button>
+              <button class="button is-light" id="reset-iso-button">恢复自动</button>
+            </div>
+          </div>
           <p class="is-size-6" id="volume-status"></p>
         </div>
       </div>
@@ -220,6 +238,12 @@
         }
 
         const viewer = $3Dmol.createViewer(container, { backgroundColor: '#ffffff' });
+        let currentVolume = null;
+
+        const isoPosInput = document.getElementById('iso-pos-input');
+        const isoNegInput = document.getElementById('iso-neg-input');
+        const applyIsoButton = document.getElementById('apply-iso-button');
+        const resetIsoButton = document.getElementById('reset-iso-button');
 
         function clamp(value, min, max) {
           return Math.min(Math.max(value, min), max);
@@ -296,30 +320,76 @@
           return value.toExponential(3);
         }
 
-        function renderVolume(buffer, format, label) {
+        function drawIsosurfaces(voldata, isoPos, isoNeg, label, stats) {
+          viewer.removeAllSurfaces();
+
+          if (!Number.isFinite(isoPos) || !Number.isFinite(isoNeg)) {
+            setStatus('等值面参数无效，请输入数字。', true);
+            return;
+          }
+
+          if (isoPos === isoNeg || Math.abs(isoPos - isoNeg) < 1e-9) {
+            setStatus('等值面阈值过于接近，无法生成曲面。请调整正负阈值。', true);
+            return;
+          }
+
           try {
-            const voldata = new $3Dmol.VolumeData(buffer, format);
-            const stats = computeIsoLevels(voldata);
-            viewer.removeAllSurfaces();
             viewer.addIsosurface(voldata, {
-              isoval: stats.pos,
+              isoval: isoPos,
               color: '#f5c400',
               opacity: 0.85,
               smoothness: 2
             });
             viewer.addIsosurface(voldata, {
-              isoval: stats.neg,
+              isoval: isoNeg,
               color: '#1f77b4',
               opacity: 0.35,
               smoothness: 2
             });
             viewer.zoomTo();
             viewer.render();
+
+            if (currentVolume) {
+              currentVolume.currentPos = isoPos;
+              currentVolume.currentNeg = isoNeg;
+            }
+
+            if (isoPosInput) isoPosInput.value = isoPos;
+            if (isoNegInput) isoNegInput.value = isoNeg;
+
             const descriptor = label || '匿名文件';
-            const message = `已加载体数据：${descriptor}\n` +
-              `阈值: +${formatNumber(stats.pos)} / ${formatNumber(stats.neg)} ` +
-              `(范围 ${formatNumber(stats.min)} ~ ${formatNumber(stats.max)}, σ=${formatNumber(stats.sigma)})`;
+            const rangeText = stats
+              ? `(范围 ${formatNumber(stats.min)} ~ ${formatNumber(stats.max)}, σ=${formatNumber(stats.sigma)})`
+              : '';
+            const message = `已加载体数据：${descriptor}\n阈值: +${formatNumber(isoPos)} / ${formatNumber(isoNeg)} ${rangeText}`;
             setStatus(message, false);
+          } catch (error) {
+            setStatus('生成等值面时出错：' + error.message, true);
+            console.error(error);
+          }
+        }
+
+        function renderVolume(buffer, format, label) {
+          try {
+            const voldata = new $3Dmol.VolumeData(buffer, format);
+            const stats = computeIsoLevels(voldata);
+            currentVolume = {
+              voldata,
+              label,
+              stats,
+              format,
+              defaultPos: stats.pos,
+              defaultNeg: stats.neg
+            };
+
+            if (stats.min === stats.max) {
+              setStatus('体数据取值恒定，无法生成等值面。请检查源数据。', true);
+              if (isoPosInput) isoPosInput.value = '';
+              if (isoNegInput) isoNegInput.value = '';
+              return;
+            }
+
+            drawIsosurfaces(voldata, stats.pos, stats.neg, label, stats);
           } catch (error) {
             setStatus('无法解析体数据：' + error.message, true);
             console.error(error);
@@ -393,6 +463,38 @@
             });
           });
         });
+
+        if (applyIsoButton) {
+          applyIsoButton.addEventListener('click', function () {
+            if (!currentVolume || !currentVolume.voldata) {
+              setStatus('请先加载体数据。', true);
+              return;
+            }
+            const pos = parseFloat(isoPosInput?.value || '');
+            const neg = parseFloat(isoNegInput?.value || '');
+            if (!Number.isFinite(pos) || !Number.isFinite(neg)) {
+              setStatus('请输入有效的正负阈值数字。', true);
+              return;
+            }
+            drawIsosurfaces(currentVolume.voldata, pos, neg, currentVolume.label, currentVolume.stats);
+          });
+        }
+
+        if (resetIsoButton) {
+          resetIsoButton.addEventListener('click', function () {
+            if (!currentVolume || !currentVolume.voldata) {
+              setStatus('尚未加载体数据。', true);
+              return;
+            }
+            drawIsosurfaces(
+              currentVolume.voldata,
+              currentVolume.defaultPos,
+              currentVolume.defaultNeg,
+              currentVolume.label,
+              currentVolume.stats
+            );
+          });
+        }
       });
     })();
   </script>

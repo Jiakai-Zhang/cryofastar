@@ -181,6 +181,24 @@ body {
   margin-top: 0.75rem;
 }
 
+.volume-iso-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-end;
+  margin-bottom: 0.75rem;
+}
+
+.volume-iso-controls .field {
+  min-width: 160px;
+  margin-bottom: 0;
+}
+
+.volume-iso-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
 #volume-status {
   white-space: pre-line;
 }
