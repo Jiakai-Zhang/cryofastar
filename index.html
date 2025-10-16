@@ -221,25 +221,105 @@
 
         const viewer = $3Dmol.createViewer(container, { backgroundColor: '#ffffff' });
 
+        function clamp(value, min, max) {
+          return Math.min(Math.max(value, min), max);
+        }
+
+        function computeIsoLevels(voldata) {
+          const data = voldata?.data || voldata?.values;
+          if (!data || !data.length) {
+            return {
+              pos: 1.0,
+              neg: -1.0,
+              min: 0,
+              max: 0,
+              mean: 0,
+              sigma: 0
+            };
+          }
+
+          let min = Infinity;
+          let max = -Infinity;
+          let sum = 0;
+          let count = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = data[i];
+            if (!Number.isFinite(v)) {
+              continue;
+            }
+            count++;
+            sum += v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+
+          if (!count) {
+            return {
+              pos: 1.0,
+              neg: -1.0,
+              min: 0,
+              max: 0,
+              mean: 0,
+              sigma: 0
+            };
+          }
+
+          const mean = sum / count;
+          let varSum = 0;
+          for (let i = 0; i < data.length; i++) {
+            const v = data[i];
+            if (!Number.isFinite(v)) {
+              continue;
+            }
+            const diff = v - mean;
+            varSum += diff * diff;
+          }
+          const sigma = Math.sqrt(varSum / count) || (max - min) / 6 || 1e-3;
+
+          let pos = clamp(mean + 2.5 * sigma, min, max);
+          let neg = clamp(mean - 2.5 * sigma, min, max);
+
+          if (pos <= neg) {
+            const mid = (max + min) / 2;
+            const span = (max - min) || 1e-3;
+            pos = clamp(mid + span * 0.25, min, max);
+            neg = clamp(mid - span * 0.25, min, max);
+          }
+
+          return { pos, neg, min, max, mean, sigma };
+        }
+
+        function formatNumber(value) {
+          if (Math.abs(value) >= 0.01 && Math.abs(value) < 1000) {
+            return value.toFixed(4);
+          }
+          return value.toExponential(3);
+        }
+
         function renderVolume(buffer, format, label) {
           try {
             const voldata = new $3Dmol.VolumeData(buffer, format);
+            const stats = computeIsoLevels(voldata);
             viewer.removeAllSurfaces();
             viewer.addIsosurface(voldata, {
-              isoval: 1.0,
+              isoval: stats.pos,
               color: '#f5c400',
               opacity: 0.85,
               smoothness: 2
             });
             viewer.addIsosurface(voldata, {
-              isoval: -1.0,
+              isoval: stats.neg,
               color: '#1f77b4',
               opacity: 0.35,
               smoothness: 2
             });
             viewer.zoomTo();
             viewer.render();
-            setStatus('已加载体数据：' + (label || '匿名文件'), false);
+            const descriptor = label || '匿名文件';
+            const message = `已加载体数据：${descriptor}\n` +
+              `阈值: +${formatNumber(stats.pos)} / ${formatNumber(stats.neg)} ` +
+              `(范围 ${formatNumber(stats.min)} ~ ${formatNumber(stats.max)}, σ=${formatNumber(stats.sigma)})`;
+            setStatus(message, false);
           } catch (error) {
             setStatus('无法解析体数据：' + error.message, true);
             console.error(error);

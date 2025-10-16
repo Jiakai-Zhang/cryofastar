@@ -181,6 +181,10 @@ body {
   margin-top: 0.75rem;
 }
 
+#volume-status {
+  white-space: pre-line;
+}
+
 .video-placeholder {
   position: absolute;
   top: 0;
