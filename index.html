@@ -461,10 +461,28 @@
                 opacity: 0.9
               });
               stage.autoView();
+              try {
+                const centerVec = comp.getCenter(new NGL.Vector3());
+                if (stage.viewerControls && stage.viewerControls.controls && centerVec) {
+                  stage.viewerControls.controls.target.copy(centerVec);
+                  stage.viewerControls.controls.update();
+                }
+              } catch (e) {
+                console.warn('Failed to recenter NGL controls:', e);
+              }
             })
             .catch(function (error) {
               setStatus('NGL 载入失败：' + error.message, true);
             });
+        }
+
+        function convertIsoTo3DMol(rawIso) {
+          if (!currentVolume || !currentVolume.transform) return rawIso;
+          const { scale, offset } = currentVolume.transform;
+          if (!Number.isFinite(scale) || Math.abs(scale) < 1e-12) {
+            return rawIso;
+          }
+          return rawIso * scale + offset;
         }
 
         function drawIsosurface(voldata, isoLevel, label, stats) {
@@ -476,8 +494,9 @@
           }
 
           try {
+            const isoInternal = convertIsoTo3DMol(isoLevel);
             viewer.addIsosurface(voldata, {
-              isoval: isoLevel,
+              isoval: isoInternal,
               color: '#f5c400',
               opacity: 0.9,
               smoothness: 2
@@ -496,7 +515,10 @@
               ? `(范围 ${formatNumber(stats.min)} ~ ${formatNumber(stats.max)}, σ=${formatNumber(stats.sigma)})`
               : '';
             const warningLine = currentVolume?.warning ? `\n${currentVolume.warning}` : '';
-            const message = `已加载体数据：${descriptor}\n阈值: ${formatNumber(isoLevel)} ${rangeText}${warningLine}`;
+            const internalText = currentVolume?.transform
+              ? `（3Dmol 内部阈值 ≈ ${formatNumber(convertIsoTo3DMol(isoLevel))}）`
+              : '';
+            const message = `已加载体数据：${descriptor}\n阈值: ${formatNumber(isoLevel)} ${rangeText}${internalText}${warningLine}`;
             setStatus(message, false);
 
             renderNGLVolume(currentVolume?.buffer, currentVolume?.format, stats, isoLevel);
@@ -511,6 +533,39 @@
             const rawBuffer = buffer.slice(0);
             const analysis = analyzeRawVolume(rawBuffer);
             const voldata = new $3Dmol.VolumeData(rawBuffer, format);
+            const internalStats = (function () {
+              try {
+                const arr = voldata?.data || voldata?.values || (voldata?.volume && voldata.volume.data);
+                if (!arr || !arr.length) return null;
+                let min = Infinity;
+                let max = -Infinity;
+                let sum = 0;
+                let valid = 0;
+                for (let i = 0; i < arr.length; i++) {
+                  const v = arr[i];
+                  if (!Number.isFinite(v)) continue;
+                  valid++;
+                  sum += v;
+                  if (v < min) min = v;
+                  if (v > max) max = v;
+                }
+                if (!valid) return null;
+                const mean = sum / valid;
+                let varSum = 0;
+                for (let i = 0; i < arr.length; i++) {
+                  const v = arr[i];
+                  if (!Number.isFinite(v)) continue;
+                  const diff = v - mean;
+                  varSum += diff * diff;
+                }
+                const sigma = Math.sqrt(varSum / valid);
+                return { min, max, mean, sigma };
+              } catch (e) {
+                console.warn('Unable to analyze 3Dmol volume:', e);
+                return null;
+              }
+            })();
+
             const isoStats = computeIsoLevels(voldata, analysis);
             const combinedStats = Object.assign({}, analysis || {}, isoStats);
             let warning = '';
@@ -527,6 +582,15 @@
               warning = '（警告：体数据中缺少有效数值，请检查文件内容。）';
             }
 
+            let transform = null;
+            if (analysis && internalStats && Number.isFinite(analysis.max) && Number.isFinite(analysis.min) && Math.abs(analysis.max - analysis.min) > 1e-12) {
+              const scale = (internalStats.max - internalStats.min) / (analysis.max - analysis.min);
+              const offset = internalStats.min - scale * analysis.min;
+              if (Number.isFinite(scale) && Number.isFinite(offset)) {
+                transform = { scale, offset, internal: internalStats };
+              }
+            }
+
             currentVolume = {
               buffer: rawBuffer,
               voldata,
@@ -535,7 +599,8 @@
               stats: combinedStats,
               defaultIso: isoStats.pos,
               currentIso: isoStats.pos,
-              warning
+              warning,
+              transform
             };
 
             if (combinedStats && combinedStats.min === combinedStats.max) {
