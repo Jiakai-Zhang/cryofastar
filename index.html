@@ -33,6 +33,7 @@
   <script defer src="static/js/fontawesome.all.min.js"></script>
   <script src="static/js/bulma-carousel.min.js"></script>
   <script src="static/js/bulma-slider.min.js"></script>
+  <script src="https://unpkg.com/3dmol@2.2.7/build/3Dmol-min.js"></script>
   <script src="static/js/index.js"></script>
 </head>
 <body>
@@ -146,6 +147,130 @@
       </div>
     </div>
   </section>
+
+  <section class="hero is-small">
+    <div class="hero-body">
+      <div class="container is-max-desktop">
+        <div class="content">
+          <h2 class="title is-3">Interactive Volume Renderer</h2>
+          <p>
+            Explore CryoFastAR reconstructions directly in the browser. The viewer below renders volumetric density maps (MRC/CCP4/MAP) using GPU-based isosurfaces.
+            Load the bundled sample volume or drag-and-drop your own files to inspect reconstructions interactively.
+          </p>
+          <div class="file has-name is-centered volume-file-input">
+            <label class="file-label">
+              <input class="file-input" type="file" id="mrc-file-input" accept=".mrc,.map,.ccp4,.mrc.gz,.map.gz,.ccp4.gz">
+              <span class="file-cta">
+                <span class="file-icon">
+                  <i class="fas fa-upload"></i>
+                </span>
+                <span class="file-label">
+                  上传或替换体数据…
+                </span>
+              </span>
+              <span class="file-name" id="mrc-file-name">sample_map.ccp4</span>
+            </label>
+          </div>
+          <div id="volume-viewer" class="volume-viewer"></div>
+          <p class="has-text-grey is-size-7 volume-hint">
+            双击重置视角。上传新的体数据时，我们会自动推断扩展名（未压缩 MRC/MAP/CCP4）。如需 gzip 压缩，请先解压。
+          </p>
+          <p class="is-size-6" id="volume-status"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    (function () {
+      function detectFormat(name) {
+        const lowered = name.toLowerCase();
+        if (lowered.endsWith('.ccp4')) return 'ccp4';
+        if (lowered.endsWith('.map')) return 'ccp4';
+        if (lowered.endsWith('.mrc')) return 'mrc';
+        return 'ccp4';
+      }
+
+      function setStatus(message, isError) {
+        const statusEl = document.getElementById('volume-status');
+        if (!statusEl) return;
+        statusEl.textContent = message || '';
+        statusEl.className = isError ? 'has-text-danger' : 'has-text-grey';
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        const container = document.getElementById('volume-viewer');
+        if (!container || typeof $3Dmol === 'undefined') {
+          return;
+        }
+
+        const viewer = $3Dmol.createViewer(container, { backgroundColor: '#ffffff' });
+
+        function renderVolume(buffer, format, label) {
+          try {
+            const voldata = new $3Dmol.VolumeData(buffer, format);
+            viewer.removeAllSurfaces();
+            viewer.addIsosurface(voldata, {
+              isoval: 1.0,
+              color: '#f5c400',
+              opacity: 0.85,
+              smoothness: 2
+            });
+            viewer.addIsosurface(voldata, {
+              isoval: -1.0,
+              color: '#1f77b4',
+              opacity: 0.35,
+              smoothness: 2
+            });
+            viewer.zoomTo();
+            viewer.render();
+            setStatus('已加载体数据：' + (label || '匿名文件'), false);
+          } catch (error) {
+            setStatus('无法解析体数据：' + error.message, true);
+            console.error(error);
+          }
+        }
+
+        fetch('static/data/sample_map.ccp4')
+          .then(function (response) {
+            if (!response.ok) {
+              throw new Error('HTTP ' + response.status);
+            }
+            return response.arrayBuffer();
+          })
+          .then(function (buffer) {
+            renderVolume(buffer, 'ccp4', 'sample_map.ccp4');
+          })
+          .catch(function (error) {
+            setStatus('加载默认样例失败：' + error.message, true);
+          });
+
+        const fileInput = document.getElementById('mrc-file-input');
+        const fileName = document.getElementById('mrc-file-name');
+
+        if (fileInput) {
+          fileInput.addEventListener('change', function (event) {
+            const file = event.target.files && event.target.files[0];
+            if (!file) {
+              return;
+            }
+            if (fileName) {
+              fileName.textContent = file.name;
+            }
+            setStatus('正在载入 ' + file.name + ' …', false);
+            file.arrayBuffer()
+              .then(function (buffer) {
+                const format = detectFormat(file.name);
+                renderVolume(buffer, format, file.name);
+              })
+              .catch(function (error) {
+                setStatus('读取文件失败：' + error.message, true);
+              });
+          });
+        }
+      });
+    })();
+  </script>
 
   <section class="hero is-small">
     <div class="hero-body">
