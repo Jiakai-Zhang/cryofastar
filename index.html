@@ -33,7 +33,7 @@
   <script defer src="static/js/fontawesome.all.min.js"></script>
   <script src="static/js/bulma-carousel.min.js"></script>
   <script src="static/js/bulma-slider.min.js"></script>
-  <script src="https://unpkg.com/3dmol@2.2.7/build/3Dmol-min.js"></script>
+  <script src="https://unpkg.com/3dmol@latest/build/3Dmol-min.js"></script>
   <script src="static/js/index.js"></script>
 </head>
 <body>
@@ -200,7 +200,11 @@
 
       document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('volume-viewer');
-        if (!container || typeof $3Dmol === 'undefined') {
+        if (!container) {
+          return;
+        }
+        if (typeof $3Dmol === 'undefined') {
+          setStatus('3Dmol.js 未正确加载，无法创建体数据查看器。', true);
           return;
         }
 
