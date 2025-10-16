@@ -34,6 +34,7 @@
   <script src="static/js/bulma-carousel.min.js"></script>
   <script src="static/js/bulma-slider.min.js"></script>
   <script src="https://unpkg.com/3dmol@latest/build/3Dmol-min.js"></script>
+  <script src="https://unpkg.com/ngl@2.0.0-dev.37/dist/ngl.js"></script>
   <script src="static/js/index.js"></script>
 </head>
 <body>
@@ -204,6 +205,15 @@
               <button class="button is-light" id="reset-iso-button">恢复自动</button>
             </div>
           </div>
+          <div class="volume-alt-viewer">
+            <p class="has-text-grey is-size-7">
+              如果想对比另一种渲染方式，可启用下方的 NGL Viewer。它会使用相同的阈值绘制表面，并支持鼠标交互。
+            </p>
+            <div class="buttons are-small">
+              <button class="button is-light" id="toggle-ngl-button">启用 NGL 备选渲染</button>
+            </div>
+            <div id="ngl-viewer" class="ngl-viewer"></div>
+          </div>
           <p class="is-size-6" id="volume-status"></p>
         </div>
       </div>
@@ -227,6 +237,183 @@
         statusEl.className = isError ? 'has-text-danger' : 'has-text-grey';
       }
 
+      function clamp(value, min, max) {
+        return Math.min(Math.max(value, min), max);
+      }
+
+      function formatNumber(value) {
+        if (!Number.isFinite(value)) return 'NaN';
+        if (Math.abs(value) >= 0.01 && Math.abs(value) < 1000) {
+          return value.toFixed(4);
+        }
+        return value.toExponential(3);
+      }
+
+      function analyzeRawVolume(buffer) {
+        try {
+          const view = new DataView(buffer);
+          const nx = view.getInt32(0, true);
+          const ny = view.getInt32(4, true);
+          const nz = view.getInt32(8, true);
+          const mode = view.getInt32(12, true);
+          const count = nx * ny * nz;
+
+          let typedArray;
+          switch (mode) {
+            case 0:
+              typedArray = new Int8Array(buffer, 1024, count);
+              break;
+            case 1:
+              typedArray = new Int16Array(buffer, 1024, count);
+              break;
+            case 2:
+              typedArray = new Float32Array(buffer, 1024, count);
+              break;
+            case 6:
+              typedArray = new Uint16Array(buffer, 1024, count);
+              break;
+            default:
+              return {
+                nx,
+                ny,
+                nz,
+                mode,
+                count,
+                min: 0,
+                max: 0,
+                mean: 0,
+                sigma: 0,
+                data: null,
+                unsupported: true
+              };
+          }
+
+          if (!typedArray || typedArray.length < count) {
+            return {
+              nx,
+              ny,
+              nz,
+              mode,
+              count,
+              min: 0,
+              max: 0,
+              mean: 0,
+              sigma: 0,
+              data: null,
+              truncated: true
+            };
+          }
+
+          let min = Infinity;
+          let max = -Infinity;
+          let sum = 0;
+          let validCount = 0;
+          for (let i = 0; i < typedArray.length; i++) {
+            const v = typedArray[i];
+            if (!Number.isFinite(v)) continue;
+            validCount++;
+            sum += v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+
+          if (!validCount) {
+            return {
+              nx,
+              ny,
+              nz,
+              mode,
+              count,
+              min: 0,
+              max: 0,
+              mean: 0,
+              sigma: 0,
+              data: typedArray,
+              empty: true
+            };
+          }
+
+          const mean = sum / validCount;
+          let varSum = 0;
+          for (let i = 0; i < typedArray.length; i++) {
+            const v = typedArray[i];
+            if (!Number.isFinite(v)) continue;
+            const diff = v - mean;
+            varSum += diff * diff;
+          }
+          const sigma = Math.sqrt(varSum / validCount) || (max - min) / 6 || 1e-3;
+
+          return {
+            nx,
+            ny,
+            nz,
+            mode,
+            count,
+            min,
+            max,
+            mean,
+            sigma,
+            data: typedArray
+          };
+        } catch (error) {
+          console.error('Failed to analyze raw volume:', error);
+          return null;
+        }
+      }
+
+      function computeIsoLevels(voldata, analysis) {
+        const source = analysis?.data || voldata?.data || voldata?.values;
+        if (!source || !source.length) {
+          return {
+            pos: 1.0,
+            neg: -1.0,
+            min: analysis?.min ?? 0,
+            max: analysis?.max ?? 0,
+            mean: analysis?.mean ?? 0,
+            sigma: analysis?.sigma ?? 0
+          };
+        }
+
+        let min = analysis?.min;
+        let max = analysis?.max;
+        let mean = analysis?.mean;
+        let sigma = analysis?.sigma;
+
+        if (!Number.isFinite(min) || !Number.isFinite(max) || !Number.isFinite(mean) || !Number.isFinite(sigma)) {
+          min = Infinity;
+          max = -Infinity;
+          let sum = 0;
+          for (let i = 0; i < source.length; i++) {
+            const v = source[i];
+            if (!Number.isFinite(v)) continue;
+            sum += v;
+            if (v < min) min = v;
+            if (v > max) max = v;
+          }
+          mean = sum / source.length;
+          let varSum = 0;
+          for (let i = 0; i < source.length; i++) {
+            const v = source[i];
+            if (!Number.isFinite(v)) continue;
+            const diff = v - mean;
+            varSum += diff * diff;
+          }
+          sigma = Math.sqrt(varSum / source.length) || (max - min) / 6 || 1e-3;
+        }
+
+        let pos = clamp(mean + 2.5 * sigma, min, max);
+        let neg = clamp(mean - 2.5 * sigma, min, max);
+
+        if (!Number.isFinite(pos) || !Number.isFinite(neg) || pos <= neg) {
+          const span = (max - min) || (Math.abs(mean) + 1e-3);
+          const mid = Number.isFinite(mean) ? mean : (max + min) / 2;
+          pos = clamp(mid + span * 0.25, min, max);
+          neg = clamp(mid - span * 0.25, min, max);
+        }
+
+        return { pos, neg, min, max, mean, sigma };
+      }
+
       document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('volume-viewer');
         if (!container) {
@@ -244,80 +431,52 @@
         const isoNegInput = document.getElementById('iso-neg-input');
         const applyIsoButton = document.getElementById('apply-iso-button');
         const resetIsoButton = document.getElementById('reset-iso-button');
+        const toggleNglButton = document.getElementById('toggle-ngl-button');
+        const nglContainer = document.getElementById('ngl-viewer');
 
-        function clamp(value, min, max) {
-          return Math.min(Math.max(value, min), max);
+        let nglStage = null;
+        let nglEnabled = false;
+
+        function ensureNglStage() {
+          if (!nglEnabled) return null;
+          if (typeof NGL === 'undefined') {
+            setStatus('NGL.js 未加载，无法启用备选渲染。', true);
+            return null;
+          }
+          if (!nglStage) {
+            nglStage = new NGL.Stage('ngl-viewer');
+            window.addEventListener('resize', function () {
+              nglStage.handleResize();
+            });
+          }
+          return nglStage;
         }
 
-        function computeIsoLevels(voldata) {
-          const data = voldata?.data || voldata?.values;
-          if (!data || !data.length) {
-            return {
-              pos: 1.0,
-              neg: -1.0,
-              min: 0,
-              max: 0,
-              mean: 0,
-              sigma: 0
-            };
-          }
-
-          let min = Infinity;
-          let max = -Infinity;
-          let sum = 0;
-          let count = 0;
-          for (let i = 0; i < data.length; i++) {
-            const v = data[i];
-            if (!Number.isFinite(v)) {
-              continue;
-            }
-            count++;
-            sum += v;
-            if (v < min) min = v;
-            if (v > max) max = v;
-          }
-
-          if (!count) {
-            return {
-              pos: 1.0,
-              neg: -1.0,
-              min: 0,
-              max: 0,
-              mean: 0,
-              sigma: 0
-            };
-          }
-
-          const mean = sum / count;
-          let varSum = 0;
-          for (let i = 0; i < data.length; i++) {
-            const v = data[i];
-            if (!Number.isFinite(v)) {
-              continue;
-            }
-            const diff = v - mean;
-            varSum += diff * diff;
-          }
-          const sigma = Math.sqrt(varSum / count) || (max - min) / 6 || 1e-3;
-
-          let pos = clamp(mean + 2.5 * sigma, min, max);
-          let neg = clamp(mean - 2.5 * sigma, min, max);
-
-          if (pos <= neg) {
-            const mid = (max + min) / 2;
-            const span = (max - min) || 1e-3;
-            pos = clamp(mid + span * 0.25, min, max);
-            neg = clamp(mid - span * 0.25, min, max);
-          }
-
-          return { pos, neg, min, max, mean, sigma };
-        }
-
-        function formatNumber(value) {
-          if (Math.abs(value) >= 0.01 && Math.abs(value) < 1000) {
-            return value.toFixed(4);
-          }
-          return value.toExponential(3);
+        function renderNGLVolume(buffer, format, stats, isoPos, isoNeg) {
+          if (!nglEnabled) return;
+          const stage = ensureNglStage();
+          if (!stage) return;
+          stage.removeAllComponents();
+          if (!buffer) return;
+          const ext = format === 'ccp4' ? 'map' : 'mrc';
+          const blob = new Blob([buffer], { type: 'application/octet-stream' });
+          stage.loadFile(blob, { ext })
+            .then(function (comp) {
+              comp.addRepresentation('surface', {
+                isolevel: isoPos,
+                color: 'gold',
+                opacity: 0.85
+              });
+              comp.addRepresentation('surface', {
+                isolevel: isoNeg,
+                color: 'steelblue',
+                opacity: 0.35
+              });
+              stage.autoView();
+            })
+            .catch(function (error) {
+              setStatus('NGL 载入失败：' + error.message, true);
+            });
         }
 
         function drawIsosurfaces(voldata, isoPos, isoNeg, label, stats) {
@@ -361,8 +520,11 @@
             const rangeText = stats
               ? `(范围 ${formatNumber(stats.min)} ~ ${formatNumber(stats.max)}, σ=${formatNumber(stats.sigma)})`
               : '';
-            const message = `已加载体数据：${descriptor}\n阈值: +${formatNumber(isoPos)} / ${formatNumber(isoNeg)} ${rangeText}`;
+            const warningLine = currentVolume?.warning ? `\n${currentVolume.warning}` : '';
+            const message = `已加载体数据：${descriptor}\n阈值: +${formatNumber(isoPos)} / ${formatNumber(isoNeg)} ${rangeText}${warningLine}`;
             setStatus(message, false);
+
+            renderNGLVolume(currentVolume?.buffer, currentVolume?.format, stats, isoPos, isoNeg);
           } catch (error) {
             setStatus('生成等值面时出错：' + error.message, true);
             console.error(error);
@@ -371,25 +533,48 @@
 
         function renderVolume(buffer, format, label) {
           try {
-            const voldata = new $3Dmol.VolumeData(buffer, format);
-            const stats = computeIsoLevels(voldata);
+            const rawBuffer = buffer.slice(0);
+            const analysis = analyzeRawVolume(rawBuffer);
+            const voldata = new $3Dmol.VolumeData(rawBuffer, format);
+            const isoStats = computeIsoLevels(voldata, analysis);
+            const combinedStats = Object.assign({}, analysis || {}, isoStats);
+            let warning = '';
+
+            if (combinedStats) {
+              combinedStats.data = undefined;
+            }
+
+            if (analysis?.unsupported) {
+              warning = '（提示：当前 MRC mode 暂不完全支持自动解析，阈值可能需要手动调整。）';
+            } else if (analysis?.truncated) {
+              warning = '（警告：文件尺寸与头信息不符，渲染结果可能异常。）';
+            } else if (analysis?.empty) {
+              warning = '（警告：体数据中缺少有效数值，请检查文件内容。）';
+            }
+
             currentVolume = {
+              buffer: rawBuffer,
               voldata,
               label,
-              stats,
               format,
-              defaultPos: stats.pos,
-              defaultNeg: stats.neg
+              stats: combinedStats,
+              defaultPos: isoStats.pos,
+              defaultNeg: isoStats.neg,
+              currentPos: isoStats.pos,
+              currentNeg: isoStats.neg,
+              warning
             };
 
-            if (stats.min === stats.max) {
+            if (combinedStats && combinedStats.min === combinedStats.max) {
               setStatus('体数据取值恒定，无法生成等值面。请检查源数据。', true);
               if (isoPosInput) isoPosInput.value = '';
               if (isoNegInput) isoNegInput.value = '';
+              viewer.removeAllSurfaces();
+              renderNGLVolume(buffer, format, combinedStats, isoStats.pos, isoStats.neg);
               return;
             }
 
-            drawIsosurfaces(voldata, stats.pos, stats.neg, label, stats);
+            drawIsosurfaces(voldata, isoStats.pos, isoStats.neg, label, combinedStats);
           } catch (error) {
             setStatus('无法解析体数据：' + error.message, true);
             console.error(error);
@@ -413,12 +598,6 @@
               setStatus('加载失败：' + error.message, true);
               return false;
             });
-        }
-
-        function updatePresetSelection(activeButton) {
-          document.querySelectorAll('.volume-preset-button').forEach(function (btn) {
-            btn.classList.toggle('is-selected', btn === activeButton);
-          });
         }
 
         loadVolumeFromUrl('static/data/sample_map.ccp4', 'ccp4', 'sample_map.ccp4');
@@ -445,6 +624,12 @@
               .catch(function (error) {
                 setStatus('读取文件失败：' + error.message, true);
               });
+          });
+        }
+
+        function updatePresetSelection(activeButton) {
+          document.querySelectorAll('.volume-preset-button').forEach(function (btn) {
+            btn.classList.toggle('is-selected', btn === activeButton);
           });
         }
 
@@ -493,6 +678,32 @@
               currentVolume.label,
               currentVolume.stats
             );
+          });
+        }
+
+        if (toggleNglButton) {
+          toggleNglButton.addEventListener('click', function () {
+            nglEnabled = !nglEnabled;
+            if (nglEnabled) {
+              toggleNglButton.textContent = '关闭 NGL 备选渲染';
+              nglContainer?.classList.add('is-active');
+              ensureNglStage();
+              if (currentVolume && currentVolume.buffer) {
+                renderNGLVolume(
+                  currentVolume.buffer,
+                  currentVolume.format,
+                  currentVolume.stats,
+                  currentVolume.currentPos,
+                  currentVolume.currentNeg
+                );
+              }
+            } else {
+              toggleNglButton.textContent = '启用 NGL 备选渲染';
+              nglContainer?.classList.remove('is-active');
+              if (nglStage) {
+                nglStage.removeAllComponents();
+              }
+            }
           });
         }
       });

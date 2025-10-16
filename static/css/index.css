@@ -199,6 +199,24 @@ body {
   gap: 0.5rem;
 }
 
+.volume-alt-viewer {
+  margin-top: 1rem;
+}
+
+.ngl-viewer {
+  display: none;
+  width: 100%;
+  height: 360px;
+  border: 1px solid #dfe4ea;
+  border-radius: 12px;
+  margin-top: 0.75rem;
+  background: #ffffff;
+}
+
+.ngl-viewer.is-active {
+  display: block;
+}
+
 #volume-status {
   white-space: pre-line;
 }
