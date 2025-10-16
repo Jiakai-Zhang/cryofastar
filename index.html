@@ -157,6 +157,17 @@
             Explore CryoFastAR reconstructions directly in the browser. The viewer below renders volumetric density maps (MRC/CCP4/MAP) using GPU-based isosurfaces.
             Load the bundled sample volume or drag-and-drop your own files to inspect reconstructions interactively.
           </p>
+          <div class="buttons is-centered volume-preset-buttons">
+            <button class="button is-light volume-preset-button is-selected" data-volume-path="static/data/sample_map.ccp4" data-volume-format="ccp4" data-volume-label="sample_map.ccp4">
+              Sample CCP4
+            </button>
+            <button class="button is-light volume-preset-button" data-volume-path="static/data/synthetic.mrc" data-volume-format="mrc" data-volume-label="synthetic.mrc">
+              Synthetic MRC
+            </button>
+            <button class="button is-light volume-preset-button" data-volume-path="static/data/real.mrc" data-volume-format="mrc" data-volume-label="real.mrc">
+              Real MRC
+            </button>
+          </div>
           <div class="file has-name is-centered volume-file-input">
             <label class="file-label">
               <input class="file-input" type="file" id="mrc-file-input" accept=".mrc,.map,.ccp4,.mrc.gz,.map.gz,.ccp4.gz">
@@ -235,19 +246,32 @@
           }
         }
 
-        fetch('static/data/sample_map.ccp4')
-          .then(function (response) {
-            if (!response.ok) {
-              throw new Error('HTTP ' + response.status);
-            }
-            return response.arrayBuffer();
-          })
-          .then(function (buffer) {
-            renderVolume(buffer, 'ccp4', 'sample_map.ccp4');
-          })
-          .catch(function (error) {
-            setStatus('加载默认样例失败：' + error.message, true);
+        function loadVolumeFromUrl(path, format, label) {
+          setStatus('正在加载 ' + label + ' …', false);
+          return fetch(path)
+            .then(function (response) {
+              if (!response.ok) {
+                throw new Error('HTTP ' + response.status);
+              }
+              return response.arrayBuffer();
+            })
+            .then(function (buffer) {
+              renderVolume(buffer, format, label);
+              return true;
+            })
+            .catch(function (error) {
+              setStatus('加载失败：' + error.message, true);
+              return false;
+            });
+        }
+
+        function updatePresetSelection(activeButton) {
+          document.querySelectorAll('.volume-preset-button').forEach(function (btn) {
+            btn.classList.toggle('is-selected', btn === activeButton);
           });
+        }
+
+        loadVolumeFromUrl('static/data/sample_map.ccp4', 'ccp4', 'sample_map.ccp4');
 
         const fileInput = document.getElementById('mrc-file-input');
         const fileName = document.getElementById('mrc-file-name');
@@ -266,12 +290,29 @@
               .then(function (buffer) {
                 const format = detectFormat(file.name);
                 renderVolume(buffer, format, file.name);
+                updatePresetSelection(null);
               })
               .catch(function (error) {
                 setStatus('读取文件失败：' + error.message, true);
               });
           });
         }
+
+        document.querySelectorAll('.volume-preset-button').forEach(function (button) {
+          button.addEventListener('click', function () {
+            const path = button.getAttribute('data-volume-path');
+            const format = button.getAttribute('data-volume-format') || detectFormat(path);
+            const label = button.getAttribute('data-volume-label') || path.split('/').pop();
+            if (fileName) {
+              fileName.textContent = label;
+            }
+            loadVolumeFromUrl(path, format, label).then(function (success) {
+              if (success) {
+                updatePresetSelection(button);
+              }
+            });
+          });
+        });
       });
     })();
   </script>

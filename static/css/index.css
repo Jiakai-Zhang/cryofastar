@@ -153,6 +153,17 @@ body {
   margin-top: 1rem;
 }
 
+.volume-preset-buttons .button {
+  border-radius: 999px;
+}
+
+.volume-preset-buttons .button.is-selected {
+  background-color: #f5c400;
+  color: #1a1a1a;
+  border-color: #f0b400;
+  box-shadow: 0 0 0 2px rgba(245, 196, 0, 0.2);
+}
+
 .volume-file-input {
   justify-content: center;
   margin-top: 1.5rem;
