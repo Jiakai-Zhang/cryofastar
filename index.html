@@ -216,83 +216,6 @@
         statusEl.className = isError ? 'has-text-danger' : 'has-text-grey';
       }
 
-      function analyzeVolumeBuffer(buffer) {
-        try {
-          const view = new DataView(buffer);
-          const nx = view.getInt32(0, true);
-          const ny = view.getInt32(4, true);
-          const nz = view.getInt32(8, true);
-          const mode = view.getInt32(12, true);
-          const count = nx * ny * nz;
-          let typedArray;
-          switch (mode) {
-            case 0:
-              typedArray = new Int8Array(buffer, 1024, count);
-              break;
-            case 1:
-              typedArray = new Int16Array(buffer, 1024, count);
-              break;
-            case 2:
-              typedArray = new Float32Array(buffer, 1024, count);
-              break;
-            case 6:
-              typedArray = new Uint16Array(buffer, 1024, count);
-              break;
-            default:
-              return { unsupported: true };
-          }
-          if (!typedArray || typedArray.length < count) {
-            return { truncated: true };
-          }
-          let min = Infinity;
-          let max = -Infinity;
-          let sum = 0;
-          let valid = 0;
-          for (let i = 0; i < typedArray.length; i++) {
-            const v = typedArray[i];
-            if (!Number.isFinite(v)) continue;
-            valid++;
-            sum += v;
-            if (v < min) min = v;
-            if (v > max) max = v;
-          }
-          if (!valid) {
-            return { empty: true };
-          }
-          const mean = sum / valid;
-          let varSum = 0;
-          for (let i = 0; i < typedArray.length; i++) {
-            const v = typedArray[i];
-            if (!Number.isFinite(v)) continue;
-            const diff = v - mean;
-            varSum += diff * diff;
-          }
-          const sigma = Math.sqrt(varSum / valid) || ((max - min) || 1) / 6;
-          return { nx, ny, nz, mode, min, max, mean, sigma };
-        } catch (error) {
-          console.warn('Failed to analyze volume buffer:', error);
-          return null;
-        }
-      }
-
-      function clamp(value, min, max) {
-        return Math.min(Math.max(value, min), max);
-      }
-
-      function chooseInitialIso(preferred, stats) {
-        if (!stats || !Number.isFinite(stats.min) || !Number.isFinite(stats.max)) {
-          return preferred;
-        }
-        if (preferred >= stats.min && preferred <= stats.max) {
-          return preferred;
-        }
-        const alt = stats.mean + 2.5 * stats.sigma;
-        if (Number.isFinite(alt) && alt >= stats.min && alt <= stats.max) {
-          return alt;
-        }
-        return stats.min + (stats.max - stats.min) * 0.25;
-      }
-
       document.addEventListener('DOMContentLoaded', function () {
         const container = document.getElementById('ngl-viewer');
         if (!container) {
@@ -321,32 +244,13 @@
         let currentComponent = null;
         let currentIso = 1.0;
         let currentLabel = '';
-        let currentStats = null;
 
         function focusComponent(comp) {
           try {
-            const center = comp.getCenter(new NGL.Vector3());
             stage.autoView(comp, 200);
-            if (center && stage.viewerControls && stage.viewerControls.controls) {
-              stage.viewerControls.controls.target.copy(center);
-              stage.viewerControls.controls.update();
-            }
           } catch (error) {
-            console.warn('无法重定向相机中心：', error);
+            console.warn('无法自动调整相机：', error);
           }
-        }
-
-        function statusMessage(isoValue) {
-          const stats = currentStats;
-          let rangeText = '';
-          if (stats && Number.isFinite(stats.min) && Number.isFinite(stats.max)) {
-            rangeText = `（范围 ${stats.min.toExponential(3)} ~ ${stats.max.toExponential(3)}, σ=${stats.sigma.toExponential(3)})`;
-            if (isoValue < stats.min || isoValue > stats.max) {
-              rangeText += ' — 注意：当前阈值在数据范围之外。';
-            }
-          }
-          return `已加载体数据：${currentLabel}
-阈值: ${isoValue.toFixed(4)} ${rangeText}`;
         }
 
         function applyIsosurface(isoValue) {
@@ -361,26 +265,21 @@
           });
           focusComponent(currentComponent);
           currentIso = isoValue;
-          setStatus(statusMessage(isoValue), false);
+          setStatus(`已加载体数据：${currentLabel}
+阈值: ${isoValue.toFixed(4)}`, false);
         }
 
         function loadFromBlob(blob, format, label) {
           const ext = format === 'ccp4' ? 'map' : 'mrc';
           setStatus(`正在加载 ${label} …`, false);
-          return blob.arrayBuffer().then(function (buffer) {
-            currentStats = analyzeVolumeBuffer(buffer);
-            const initialIso = chooseInitialIso(parseFloat(isoInput?.value || '1') || 1, currentStats);
-            if (isoInput) {
-              isoInput.value = initialIso.toPrecision(6);
+          stage.loadFile(blob, { ext }).then(function (comp) {
+            if (currentComponent) {
+              stage.removeComponent(currentComponent);
             }
-            return stage.loadFile(blob, { ext }).then(function (comp) {
-              if (currentComponent) {
-                stage.removeComponent(currentComponent);
-              }
-              currentComponent = comp;
-              currentLabel = label;
-              applyIsosurface(initialIso);
-            });
+            currentComponent = comp;
+            currentLabel = label;
+            const initIso = parseFloat(isoInput?.value || '1') || 1;
+            applyIsosurface(initIso);
           }).catch(function (error) {
             setStatus('加载失败：' + error.message, true);
           });
@@ -393,7 +292,7 @@
             }
             return response.arrayBuffer();
           }).then(function (buffer) {
-            return loadFromBlob(new Blob([buffer], { type: 'application/octet-stream' }), format, label);
+            loadFromBlob(new Blob([buffer], { type: 'application/octet-stream' }), format, label);
           });
         }
 
@@ -448,12 +347,11 @@
 
         if (resetIsoButton) {
           resetIsoButton.addEventListener('click', function () {
-            const iso = chooseInitialIso(1.0, currentStats);
             if (isoInput) {
-              isoInput.value = iso.toPrecision(6);
+              isoInput.value = '1';
             }
             if (currentComponent) {
-              applyIsosurface(iso);
+              applyIsosurface(1.0);
             }
           });
         }
