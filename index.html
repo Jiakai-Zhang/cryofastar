@@ -146,58 +146,59 @@
     </div>
   </section>
 
-  <section class="hero is-small">
-    <div class="hero-body">
-      <div class="container is-max-desktop">
-        <div class="content">
-          <h2 class="title is-3">Interactive Volume Renderer</h2>
-          <p>
-            Explore CryoFastAR reconstructions directly in the browser. The viewer below renders volumetric density maps (MRC/CCP4/MAP) using GPU-based isosurfaces.
-            Load the bundled sample volume or drag-and-drop your own files to inspect reconstructions interactively.
-          </p>
-          <div class="buttons is-centered volume-preset-buttons">
-            <button class="button is-light volume-preset-button" data-volume-path="static/data/synthetic.mrc" data-volume-format="mrc" data-volume-label="synthetic.mrc">
-              Synthetic MRC
-            </button>
-            <button class="button is-light volume-preset-button" data-volume-path="static/data/real.mrc" data-volume-format="mrc" data-volume-label="real.mrc">
-              Real MRC
-            </button>
-          </div>
-          <div class="file has-name is-centered volume-file-input">
-            <label class="file-label">
-              <input class="file-input" type="file" id="mrc-file-input" accept=".mrc,.map,.ccp4,.mrc.gz,.map.gz,.ccp4.gz">
-              <span class="file-cta">
-                <span class="file-icon">
-                  <i class="fas fa-upload"></i>
-                </span>
-              <span class="file-label">
-                  上传或替换体数据…
-                </span>
-              </span>
-              <span class="file-name" id="mrc-file-name">synthetic.mrc</span>
-            </label>
-          </div>
-          <div id="ngl-viewer" class="ngl-viewer"></div>
-          <p class="has-text-grey is-size-7 volume-hint">
-            默认阈值为 1。拖动鼠标可绕颗粒中心旋转，滚轮缩放；上传新的体数据时支持未压缩的 MRC/MAP/CCP4 文件。
-          </p>
-          <div class="volume-iso-controls">
-            <div class="field">
-              <label class="label is-small">等值面 (<code>isoval</code>)</label>
-              <div class="control">
-                <input class="input is-small" id="iso-input" type="number" step="0.0001" placeholder="自动">
-              </div>
-            </div>
-            <div class="buttons are-small volume-iso-buttons">
-              <button class="button is-link is-light" id="apply-iso-button">应用阈值</button>
-              <button class="button is-light" id="reset-iso-button">恢复自动</button>
-            </div>
-          </div>
-          <p class="is-size-6" id="volume-status"></p>
-        </div>
-      </div>
-    </div>
-  </section>
+  <!-- Hidden Interactive Volume Renderer -->
+  <!--   <section class="hero is-small"> -->
+  <!--     <div class="hero-body"> -->
+  <!--       <div class="container is-max-desktop"> -->
+  <!--         <div class="content"> -->
+  <!--           <h2 class="title is-3">Interactive Volume Renderer</h2> -->
+  <!--           <p> -->
+  <!--             Explore CryoFastAR reconstructions directly in the browser. The viewer below renders volumetric density maps (MRC/CCP4/MAP) using GPU-based isosurfaces. -->
+  <!--             Load the bundled sample volume or drag-and-drop your own files to inspect reconstructions interactively. -->
+  <!--           </p> -->
+  <!--           <div class="buttons is-centered volume-preset-buttons"> -->
+  <!--             <button class="button is-light volume-preset-button" data-volume-path="static/data/synthetic.mrc" data-volume-format="mrc" data-volume-label="synthetic.mrc"> -->
+  <!--               Synthetic MRC -->
+  <!--             </button> -->
+  <!--             <button class="button is-light volume-preset-button" data-volume-path="static/data/real.mrc" data-volume-format="mrc" data-volume-label="real.mrc"> -->
+  <!--               Real MRC -->
+  <!--             </button> -->
+  <!--           </div> -->
+  <!--           <div class="file has-name is-centered volume-file-input"> -->
+  <!--             <label class="file-label"> -->
+  <!--               <input class="file-input" type="file" id="mrc-file-input" accept=".mrc,.map,.ccp4,.mrc.gz,.map.gz,.ccp4.gz"> -->
+  <!--               <span class="file-cta"> -->
+  <!--                 <span class="file-icon"> -->
+  <!--                   <i class="fas fa-upload"></i> -->
+  <!--                 </span> -->
+  <!--               <span class="file-label"> -->
+  <!--                   上传或替换体数据… -->
+  <!--                 </span> -->
+  <!--               </span> -->
+  <!--               <span class="file-name" id="mrc-file-name">synthetic.mrc</span> -->
+  <!--             </label> -->
+  <!--           </div> -->
+  <!--           <div id="ngl-viewer" class="ngl-viewer"></div> -->
+  <!--           <p class="has-text-grey is-size-7 volume-hint"> -->
+  <!--             默认阈值为 1。拖动鼠标可绕颗粒中心旋转，滚轮缩放；上传新的体数据时支持未压缩的 MRC/MAP/CCP4 文件。 -->
+  <!--           </p> -->
+  <!--           <div class="volume-iso-controls"> -->
+  <!--             <div class="field"> -->
+  <!--               <label class="label is-small">等值面 (<code>isoval</code>)</label> -->
+  <!--               <div class="control"> -->
+  <!--                 <input class="input is-small" id="iso-input" type="number" step="0.0001" placeholder="自动"> -->
+  <!--               </div> -->
+  <!--             </div> -->
+  <!--             <div class="buttons are-small volume-iso-buttons"> -->
+  <!--               <button class="button is-link is-light" id="apply-iso-button">应用阈值</button> -->
+  <!--               <button class="button is-light" id="reset-iso-button">恢复自动</button> -->
+  <!--             </div> -->
+  <!--           </div> -->
+  <!--           <p class="is-size-6" id="volume-status"></p> -->
+  <!--         </div> -->
+  <!--       </div> -->
+  <!--     </div> -->
+  <!--   </section> -->
 
   <script>
     (function () {
